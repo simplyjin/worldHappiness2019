@@ -7,6 +7,8 @@ output: html_document
 ```{r}
 library(tidyverse)
 library(corrplot)
+library(countrycode)
+library(reshape2)
 ```
 
 ```{r}
@@ -103,7 +105,103 @@ Cor.data <- cor(wh_combined[c(3:9)])
 psych::cor.plot(Cor.data, method = 'color')  
 corrplot(Cor.data, method = "color")  
 corrplot(Cor.data, method = "number", type = "upper")  
+```
+
+```{r}
+wh_combined$Region <- countrycode(sourcevar = wh_combined$Country, 
+                                  origin = "country.name", 
+                                  destination = "region")
 
 
+wh_combined$Region23 <- countrycode(sourcevar = wh_combined$Country, 
+                                  origin = "country.name", 
+                                  destination = "region23")
+wh_combined %>% 
+  filter(is.na(Region23))
+
+wh_combined <- wh_combined %>% 
+  group_by(Country) %>% 
+  mutate(Region23 = replace(Region23, is.na(Region23), "Southern Europe"))
+
+wh_combined %>% 
+  filter(Country == "Kosovo")
+
+#Macedonia changed its name in 2019 to North Macedonia
+wh_combined %>% 
+  filter(Country == "North Macedonia")
+
+wh_combined <- wh_combined %>% 
+  mutate(Country = ifelse(as.character(Country == "Macedonia"), "North Macedonia", as.character(Country))) 
+
+```
+
+
+```{r}
+#graph by region23 for all years
+wh_combined %>% 
+  group_by(Country, year) %>% 
+  ggplot(aes(x = Country, y = Score, color = year)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~Region23, scales = "free_y") +
+  coord_flip()
+
+#create a df just for 2015 and 2019
+wh15_19 <- wh_combined %>% 
+  filter(year %in% c(2015, 2019))
+
+#make year a factor
+wh15_19 <- wh15_19 %>% 
+  mutate(year = as.factor(as.numeric(year)))
+
+#facet wrap by region
+wh15_19 %>% 
+  group_by(Country) %>% 
+  ggplot(aes(x = Country, y = Score, color = year)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~Region, scales = "free_y") +
+  coord_flip()
+
+
+#lets just look at one region
+wh_SA <- wh_combined %>% 
+  filter(Region23 == "South America",
+         year %in% c(2015, 2019)) %>% 
+  mutate(year = as.factor(as.numeric(year)))
+
+ggplot(wh_SA, aes(x = Country, y = Score, color = year, group = Country)) +
+  geom_line() +
+  geom_point() +
+  coord_flip()
+
+ggplot(wh_SA, aes(x = Country, y = Rank, color = year, group = Country)) +
+  geom_line() +
+  geom_point() +
+  coord_flip()
+
+
+wh_SA %>% 
+  filter(Country == "Suriname")
+
+```
+
+
+
+
+```{r}
+Happiness.Region <- wh_combined %>% 
+  group_by(Region23) %>% 
+  summarize_at(vars(Score:Generosity), mean, na.rm = TRUE)
+
+Happiness.Region.Melt <- melt(Happiness.Region)
+
+
+ggplot(Happiness.Region.Melt, aes(x = Region23, y = value, color = Region23, fill = Region23)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~variable) + theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(title = "Average value of happiness variables for different continents", 
+       y = "Average value") 
 ```
 
